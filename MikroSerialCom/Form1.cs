@@ -8,13 +8,16 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO.Ports; // SerialPort sınıfını kullanmak için gerekli kütüphane
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.TaskbarClock;
 
 
 namespace MikroSerialCom
 {
     public partial class Form1 : Form
     {
-        
+        //tek cevrim boolu
+        bool tekCevrim = true;
+
         public Form1()
         {
             InitializeComponent();
@@ -138,67 +141,106 @@ namespace MikroSerialCom
         {
             // Verileri okuyun
             string data = serialPort1.ReadExisting();
+            DateTime now = DateTime.Now;
+            string time = "[ " + now.ToString("HH:mm:ss") + " ]";
+            // Verileri ekrana yazdırın
+            this.Invoke(new Action(() => textBox3.Text += Environment.NewLine + time + " --> " + data)); // Alt satıra geçmek için Environment.NewLine sabitini kullan
+            //textbox otomatik aşağı kaydırma
+            this.Invoke(new Action(() => textBox3.SelectionStart = textBox3.Text.Length));
+            this.Invoke(new Action(() => textBox3.ScrollToCaret()));
 
-            // Veriyi parçalayın
-            // Örneğin, "/1ABC" şeklinde bir veri geldiğini varsayalım
-            // Bu veriyi başındaki "/" karakterine göre ikiye ayırırız
-            // Böylece, parts[0] = "" ve parts[1] = "1ABC" olur
-            string[] parts = data.Split('/');
 
-            // Parts dizisinin uzunluğunu kontrol edin
-            // Eğer parts dizisi iki elemandan az ise, hata mesajı verin veya veriyi atlayın
-            if (parts.Length < 2)
+            // System.IndexOutOfRangeException: 'Dizin, dizi sınırlarının dışındaydı.' hatasını önlemek için
+            if (data.Length < 2)
             {
-                // Hata mesajı verin
-                MessageBox.Show("Geçersiz veri formatı: " + data);
-
-                // Veriyi atlayın ve bir sonraki veriyi bekleyin
                 return;
             }
 
-            // Parçalanan verinin ikinci elemanını alın
-            // Bu, başındaki karakteri ve kalan veriyi içerir
-            // Örneğin, part = "1ABC"
-            string part = parts[1];
+            char[] komut = new char[2];
+            komut[0] = data[0];
+            komut[1] = data[1];
+            string komutString = new string(komut);
 
-            // Başındaki karakteri alın
-            // Bu, hangi textbox'a yazılacağını belirler
-            // Örneğin, ch = '1'
-            char ch = part[0];
+            //Kalan veriyi al
+            data = data.Substring(2);
 
-            // Kalan veriyi alın
-            // Bu, textbox'a yazılacak olan veridir
-            // Örneğin, value = "ABC"
-            string value = part.Substring(1);
-
-            // Başındaki karaktere göre bir koşul kullanın
-            // Eğer '1' ise, textBox1'e yazın
-            // Eğer '2' ise, textBox2'ye yazın
-            // Başka bir karakter ise, hata mesajı verin
-            if (ch == '1')
+            //datanın içinde / varsa / işaretine kadar olan kısmı al
+            if (data.Contains('/'))
             {
-                // Verileri textBox1'e yazdırmak için Invoke metodunu kullanın
-                this.Invoke(new Action(() =>
-                {
-                    // Verileri textBox1'e ekleyin
-                    textBox1.AppendText(value);
-                }));
+                data = data.Substring(0, data.IndexOf('/'));
             }
-            else if (ch == '2')
+
+            // switch case yapısıyla gelen komutlara göre işlem yapılabilir
+            switch (komutString)
             {
-                // Verileri textBox2'ye yazdırmak için Invoke metodunu kullanın
-                this.Invoke(new Action(() =>
-                {
-                    // Verileri textBox2'ye ekleyin
-                    textBox2.AppendText(value);
-                }));
-            }
-            else
-            {
-                // Hata mesajı verin
-                MessageBox.Show("Geçersiz veri formatı: " + data);
+                case "/1":
+                    this.Invoke(new Action(() =>
+                    {
+                        textBox1.Text += Environment.NewLine + time + " --> Buton 1 Basildi"; // Alt satıra geçmek için Environment.NewLine sabitini kullan
+                                                                                              //textBox1.AppendText("Buton 1 Basildi. ");
+                    }));
+                    // otomatik aşağı kaydırma
+                    this.Invoke(new Action(() => textBox1.SelectionStart = textBox1.Text.Length));
+                    this.Invoke(new Action(() => textBox1.ScrollToCaret()));
+                    break;
+                case "/2":
+                    this.Invoke(new Action(() =>
+                    {
+                        textBox2.Text += Environment.NewLine + time + " --> Buton 2 Basildi"; // Alt satıra geçmek için Environment.NewLine sabitini kullan
+                                                                                              // Verileri textBox2'ye ekleyin
+                                                                                              //textBox2.AppendText("Buton 2 Basildi. ");
+                    }));
+                    // otomatik aşağı kaydırma
+                    this.Invoke(new Action(() => textBox2.SelectionStart = textBox2.Text.Length));
+                    this.Invoke(new Action(() => textBox2.ScrollToCaret()));
+                    break;
+                case "/3":
+                    //mesaj değişkenini label12 'ye yazdır
+                    this.Invoke(new Action(() => label12.Text = data));
+                    //mesaj değişkeni 12 bitlik bir ADC değeridir. Bunu 0-4095 aralığına çevir ve label13'e yazdır
+                    int adc = Convert.ToInt32(data);
+                    double volt = adc * 3.3 / 4095;
+                    volt = Math.Round(volt, 4);
+                    this.Invoke(new Action(() => label13.Text = volt.ToString() + "V"));
+                    if (tekCevrim)
+                    {
+                        // seri porttan veri gönder
+                        //this.Invoke(new Action(() => serialPort1.Write("/1" + volt.ToString() + "V" + "\n" + data + '\0')));
+                        string mesaj1 = string.Format("/1{0}V\n{1}\0", volt, data);
+                        // seri porttan veri gönder
+                        this.Invoke(new Action(() => serialPort1.Write(mesaj1)));
+                    }
+
+
+
+
+                    break;
+                default:
+                    break;
             }
         }
 
+        private void textBox1_TextChanged_1(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button8_Click(object sender, EventArgs e)
+        {
+            tekCevrim = true;
+            serialPort1.Write("/6" + '\0'); // 1 adc çevrimi
+        }
+
+        private void button9_Click(object sender, EventArgs e)
+        {
+            tekCevrim = false;
+            serialPort1.Write("/7" + '\0'); // sürekli adc çevrimi
+        }
+
+        private void button10_Click(object sender, EventArgs e)
+        {
+            tekCevrim = true;
+            serialPort1.Write("/8" + '\0'); // adc durdur
+        }
     }
 }
